@@ -7,8 +7,8 @@ queryH:
  motor_command : ?M
  hall_count : ?Cb
  hall_speed : ?BS
-# encoder_count : ?C
-# encoder_speed : ?S  #these queries will publish with higher frequency and users can add other queries below encoder_speed.
+ encoder_count : ?C
+ encoder_speed : ?S  #these queries will publish with higher frequency and users can add other queries below encoder_speed.
 
 queryL: 
  volts : ?V
@@ -19,8 +19,8 @@ queryL:
 
 queryG: 
  fault_flag : ?FF  
-# status_flag : ?FS
-# firmware_id : ?FID  Users can add queries which do not require channel number under queryG tab. 
+ status_flag : ?FS
+ firmware_id : ?FID  Users can add queries which do not require channel number under queryG tab. 
  
  
  

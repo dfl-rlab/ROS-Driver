@@ -1,374 +1,316 @@
-#include "ros/ros.h"
-#include "std_msgs/String.h"
-#include "std_msgs/Int64.h"
-#include "std_msgs/Int16.h"
-#include <tf/transform_broadcaster.h>
-#include <nav_msgs/Odometry.h>
 #include <math.h>
+#include <nav_msgs/Odometry.h>
 #include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node.h>
+#include <tf/transform_broadcaster.h>
 
+#include "ros/ros.h"
+#include "std_msgs/Int16.h"
+#include "std_msgs/Int64.h"
+#include "std_msgs/String.h"
 
+class Odometry_calc
+{
+  public:
+    Odometry_calc();
 
-class Odometry_calc{
+    void spin();
 
-public:
-	Odometry_calc();
+  private:
+    ros::NodeHandle n;
+    ros::Subscriber sub;
+    ros::Subscriber l_wheel_sub;
+    ros::Subscriber r_wheel_sub;
+    ros::Publisher  odom_pub;
 
-	void spin();
+    tf::TransformBroadcaster odom_broadcaster;
+    //Encoder related variables
+    double encoder_min;
+    double encoder_max;
 
+    double encoder_low_wrap;
+    double encoder_high_wrap;
 
-private:
-	ros::NodeHandle n;
-	ros::Subscriber sub;
-	ros::Subscriber l_wheel_sub;
-	ros::Subscriber r_wheel_sub;
-	ros::Publisher odom_pub;
+    double prev_lencoder;
+    double prev_rencoder;
 
-	tf::TransformBroadcaster odom_broadcaster;
-	//Encoder related variables
-	double encoder_min;
-	double encoder_max;
+    double lmult;
+    double rmult;
 
-	double encoder_low_wrap;
-	double encoder_high_wrap;
+    double left;
+    double right;
 
-	double prev_lencoder;
-	double prev_rencoder;
+    double rate;
 
-	double lmult;
-	double rmult;
+    ros::Duration t_delta;
 
-	double left;
-	double right;
+    ros::Time t_next;
 
-	double rate;
+    ros::Time then;
 
-	ros::Duration t_delta;
+    double enc_left;
 
-	ros::Time t_next;
+    double enc_right;
 
-	ros::Time then;
+    double ticks_meter;
 
+    double base_width;
 
-	double enc_left ;
+    double dx;
 
-	double enc_right;
+    double dr;
 
-	double ticks_meter;
+    double x_final, y_final, theta_final;
 
-	double base_width;
+    ros::Time current_time, last_time;
 
-	double dx;
+    void leftencoderCb(const roboteq_motor_controller_driver::channel_values& left_ticks);
 
-	double dr;
+    void rightencoderCb(const roboteq_motor_controller_driver::channel_values& right_ticks);
+    void init_variables();
 
-	double x_final,y_final, theta_final;
-
-	ros::Time current_time, last_time;
-
-
-	void leftencoderCb(const roboteq_motor_controller_driver::channel_values& left_ticks);
-
-	void rightencoderCb(const roboteq_motor_controller_driver::channel_values& right_ticks); 	
-	void init_variables();
-
-	
-
-
-	void update();
+    void update();
 };
 
-Odometry_calc::Odometry_calc(){
+Odometry_calc::Odometry_calc()
+{
+    init_variables();
 
+    ROS_INFO("Started odometry computing node");
 
-	init_variables();
+    l_wheel_sub = n.subscribe("/hall_count", 1000, &Odometry_calc::leftencoderCb, this);
 
-	ROS_INFO("Started odometry computing node");
+    r_wheel_sub = n.subscribe("/hall_count", 1000, &Odometry_calc::rightencoderCb, this);
 
-	l_wheel_sub = n.subscribe("/hall_count",1000, &Odometry_calc::leftencoderCb, this);
-	
-	r_wheel_sub = n.subscribe("/hall_count",1000, &Odometry_calc::rightencoderCb, this);
+    odom_pub = n.advertise<nav_msgs::Odometry>("odom1", 50);
 
-
-  	odom_pub = n.advertise<nav_msgs::Odometry>("odom1", 50);   
-  	
-
-
-	//Retrieving parameters of this node
-	
+    //Retrieving parameters of this node
 }
 
 void Odometry_calc::init_variables()
 {
+    prev_lencoder = 0;
+    prev_rencoder = 0;
 
+    lmult = 0;
+    rmult = 0;
 
-	prev_lencoder = 0;
-	prev_rencoder = 0;
+    left = 0;
+    right = 0;
 
-	lmult = 0;
-	rmult = 0;
+    encoder_min = -65536;
+    encoder_max = 65536;
 
-	left = 0;
-	right = 0;
+    rate = 10;
 
-	encoder_min =  -65536;
-	encoder_max =  65536;
+    ticks_meter = 50;
 
-	rate = 10;
+    base_width = 0.3;
 
-	ticks_meter = 50;
+    encoder_low_wrap = ((encoder_max - encoder_min) * 0.3) + encoder_min;
+    encoder_high_wrap = ((encoder_max - encoder_min) * 0.7) + encoder_min;
 
-	base_width = 0.3;
+    t_delta = ros::Duration(1.0 / rate);
+    t_next = ros::Time::now() + t_delta;
 
-	
-	
+    then = ros::Time::now();
 
-	encoder_low_wrap = ((encoder_max - encoder_min) * 0.3) + encoder_min ;
-	encoder_high_wrap = ((encoder_max - encoder_min) * 0.7) + encoder_min ;
+    enc_left = 10;
+    enc_right = 0;
 
-	t_delta = ros::Duration(1.0 / rate);
-	t_next = ros::Time::now() + t_delta;
-	
-	then = ros::Time::now();
+    dx = 0;
+    dr = 0;
 
+    x_final = 0;
+    y_final = 0;
+    theta_final = 0;
 
-	enc_left = 10;
-	enc_right = 0;
-
-	dx = 0;
-	dr = 0;
- 
-	x_final = 0;y_final=0;theta_final=0;
-	
-	current_time = ros::Time::now();
-  	last_time = ros::Time::now();
-
+    current_time = ros::Time::now();
+    last_time = ros::Time::now();
 }
 
-
-
-
-
 //Spin function
-void Odometry_calc::spin(){
+void Odometry_calc::spin()
+{
+    ros::Rate loop_rate(rate);
 
-     ros::Rate loop_rate(rate);
-
-     while (ros::ok())
-	{
-		update();
-		loop_rate.sleep();
-	
-	}
-
-
+    while (ros::ok())
+    {
+        update();
+        loop_rate.sleep();
+    }
 }
 
 //Update function
-void Odometry_calc::update(){
+void Odometry_calc::update()
+{
+    ros::Time now = ros::Time::now();
 
-	ros::Time now = ros::Time::now();
-	
-//	ros::Time elapsed;
+    //	ros::Time elapsed;
 
-	double elapsed;
+    double elapsed;
 
-	double d_left, d_right, d, th,x,y;
+    double d_left, d_right, d, th, x, y;
 
+    if (now > t_next)
+    {
+        elapsed = now.toSec() - then.toSec();
 
-	if ( now > t_next) {
+        // 	        ROS_INFO_STREAM("elapsed =" << elapsed);
 
-		elapsed = now.toSec() - then.toSec(); 
+        if (enc_left == 0)
+        {
+            d_left = 0;
+            d_right = 0;
+        }
+        else
+        {
+            d_left = (left - enc_left) / (ticks_meter);
+            d_right = (right - enc_right) / (ticks_meter);
+        }
 
- // 	        ROS_INFO_STREAM("elapsed =" << elapsed);
+        enc_left = left;
+        //ROS_INFO_STREAM(left);
+        enc_right = right;
 
-		
-		
-		if(enc_left == 0){
-			d_left = 0;
-			d_right = 0;
-		}
-		else{
-			d_left = (left - enc_left) / ( ticks_meter);
-			d_right = (right - enc_right) / ( ticks_meter);
-		}
-		
-		enc_left = left;
-		//ROS_INFO_STREAM(left);
-		enc_right = right;
+        d = (d_left + d_right) / 2.0;
 
-		d = (d_left + d_right ) / 2.0;
+        ROS_INFO_STREAM(d_left << " : " << d_right);
 
-		ROS_INFO_STREAM(d_left << " : " << d_right);
+        th = (d_right - d_left) / base_width;
 
+        dx = d / elapsed;
 
-		th = ( d_right - d_left ) / base_width;
-		
-		dx = d /elapsed;
+        dr = th / elapsed;
 
-		dr = th / elapsed;
+        if (d != 0)
+        {
+            x = cos(th) * d;
+            //ROS_INFO_STREAM(x);
+            y = -sin(th) * d;
+            // calculate the final position of the robot
+            x_final = x_final + (cos(theta_final) * x - sin(theta_final) * y);
+            y_final = y_final + (sin(theta_final) * x + cos(theta_final) * y);
+        }
 
-	
-		if ( d != 0){
+        if (th != 0)
+            theta_final = theta_final + th;
 
-                	x = cos( th ) * d;
-                	//ROS_INFO_STREAM(x);
-                	y = -sin( th ) * d;
-                	// calculate the final position of the robot
-                	x_final = x_final + ( cos( theta_final ) * x - sin( theta_final ) * y );
-                	y_final = y_final + ( sin( theta_final ) * x + cos( theta_final ) * y );
+        geometry_msgs::Quaternion odom_quat;
 
-			}
+        odom_quat.x = 0.0;
+        odom_quat.y = 0.0;
+        odom_quat.z = 0.0;
 
-           	 if( th != 0)
-                	theta_final = theta_final + th;
+        odom_quat.z = sin(theta_final / 2);
+        odom_quat.w = cos(theta_final / 2);
 
-		    geometry_msgs::Quaternion odom_quat ;
+        //first, we'll publish the transform over tf
+        geometry_msgs::TransformStamped odom_trans;
+        odom_trans.header.stamp = now;
+        odom_trans.header.frame_id = "odom";
+        odom_trans.child_frame_id = "base_footprint";
 
-		    odom_quat.x = 0.0;
-		    odom_quat.y = 0.0;
-		    odom_quat.z = 0.0;
+        odom_trans.transform.translation.x = x_final;
+        odom_trans.transform.translation.y = y_final;
+        odom_trans.transform.translation.z = 0.0;
+        odom_trans.transform.rotation = odom_quat;
 
-            	    odom_quat.z = sin( theta_final / 2 );	
-            	    odom_quat.w = cos( theta_final / 2 );
+        //send the transform
+        odom_broadcaster.sendTransform(odom_trans);
 
-		    //first, we'll publish the transform over tf
-		    geometry_msgs::TransformStamped odom_trans;
-		    odom_trans.header.stamp = now;
-		    odom_trans.header.frame_id = "odom";
-		    odom_trans.child_frame_id = "base_footprint";
+        //next, we'll publish the odometry message over ROS
+        nav_msgs::Odometry odom;
+        odom.header.stamp = now;
+        odom.header.frame_id = "odom";
 
-		    odom_trans.transform.translation.x = x_final;
-		    odom_trans.transform.translation.y = y_final;
-		    odom_trans.transform.translation.z = 0.0;
-		    odom_trans.transform.rotation = odom_quat;
+        //set the position
+        odom.pose.pose.position.x = x_final;
+        odom.pose.pose.position.y = y_final;
+        odom.pose.pose.position.z = 0.0;
+        odom.pose.pose.orientation = odom_quat;
 
-		    //send the transform
-		    odom_broadcaster.sendTransform(odom_trans);
+        //set the velocity
+        odom.child_frame_id = "base_footprint";
+        odom.twist.twist.linear.x = dx;
+        odom.twist.twist.linear.y = 0;
+        odom.twist.twist.angular.z = dr;
 
-		    
-		    //next, we'll publish the odometry message over ROS
-		    nav_msgs::Odometry odom;
-		    odom.header.stamp = now;
-		    odom.header.frame_id = "odom";
+        //publish the message
+        odom_pub.publish(odom);
 
-		    //set the position
-		    odom.pose.pose.position.x = x_final;
-		    odom.pose.pose.position.y = y_final;
-		    odom.pose.pose.position.z = 0.0;
-		    odom.pose.pose.orientation = odom_quat;
+        then = now;
 
-		    //set the velocity
-		    odom.child_frame_id = "base_footprint";
-		    odom.twist.twist.linear.x = dx;
-		    odom.twist.twist.linear.y = 0;
-		    odom.twist.twist.angular.z = dr;
+        //		    ROS_INFO_STREAM("dx =" << x_final);
+        //		    ROS_INFO_STREAM("dy =" << y_final);
 
-		    //publish the message
-		    odom_pub.publish(odom);
-
-	    	    then = now;
-
-//		    ROS_INFO_STREAM("dx =" << x_final);
-
-//		    ROS_INFO_STREAM("dy =" << y_final);
-
-	            ros::spinOnce();
-
-
-		}
-	 else { ; }
-//		ROS_INFO_STREAM("Not in loop");
-		
-		
-
-
-
+        ros::spinOnce();
+    }
+    else
+    {
+        ;
+    }
+    //		ROS_INFO_STREAM("Not in loop");
 }
-
-
-
-
 
 void Odometry_calc::leftencoderCb(const roboteq_motor_controller_driver::channel_values& left_ticks)
 
 {
+    // ROS_INFO_STREAM("Left tick" << left_ticks->data);
+    double enc = left_ticks.value[1];
 
-// ROS_INFO_STREAM("Left tick" << left_ticks->data);
-	double enc = left_ticks.value[1];
-	
+    if ((enc < encoder_low_wrap) && (prev_lencoder > encoder_high_wrap))
+    {
+        lmult = lmult + 1;
+    }
 
+    if ((enc > encoder_high_wrap) && (prev_lencoder < encoder_low_wrap))
 
-	if((enc < encoder_low_wrap) && (prev_lencoder > encoder_high_wrap))
-	{
-		
-		lmult = lmult + 1;
-	}
-	
+    {
+        lmult = lmult - 1;
+    }
 
-	if((enc > encoder_high_wrap) && (prev_lencoder < encoder_low_wrap))
+    left = 1.0 * (enc + lmult * (encoder_max - encoder_min));
 
-	{
-		
-		lmult = lmult - 1;
-	}
+    prev_lencoder = enc;
 
-	left = 1.0 * (enc + lmult * (encoder_max - encoder_min ));
-
-	prev_lencoder = enc;
-
-//	ROS_INFO_STREAM("Left " << left);
-
+    //	ROS_INFO_STREAM("Left " << left);
 }
-
 
 //Right encoder callback
 
 void Odometry_calc::rightencoderCb(const roboteq_motor_controller_driver::channel_values& right_ticks)
 
 {
+    // ROS_INFO_STREAM("Right tick" << right_ticks->data);
 
+    double enc = right_ticks.value[2];
 
-// ROS_INFO_STREAM("Right tick" << right_ticks->data);
+    if ((enc < encoder_low_wrap) && (prev_lencoder > encoder_high_wrap))
+    {
+        rmult = rmult + 1;
+    }
 
+    if ((enc > encoder_high_wrap) && (prev_lencoder < encoder_low_wrap))
+    {
+        rmult = rmult - 1;
+    }
 
-	double enc = right_ticks.value[2];
-	
-	if((enc < encoder_low_wrap) && (prev_lencoder > encoder_high_wrap))
-	{
-		
-		rmult = rmult + 1;
-	}
-	
+    right = 1.0 * (enc + rmult * (encoder_max - encoder_min));
+    prev_rencoder = enc;
 
-	if((enc > encoder_high_wrap) && (prev_lencoder < encoder_low_wrap))
-
-	{
-		
-		rmult = rmult - 1;
-	}
-
-	right = 1.0 * (enc + rmult * (encoder_max - encoder_min ));
-
-	prev_rencoder = enc;
-
-//	ROS_INFO_STREAM("Right " << right);
-
-
-
+    //	ROS_INFO_STREAM("Right " << right);
 }
 
-
-
-
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 
 {
-	ros::init(argc, argv,"diff_odom");
-	Odometry_calc obj;
-	obj.spin();
+    ros::init(argc, argv, "diff_odom");
+    Odometry_calc obj;
+    obj.spin();
 
+    int         aaaa = 12;
+    float       b = 23;
+    std::string ccc = 23;
 
-	return 0;
-
+    return 0;
 }
