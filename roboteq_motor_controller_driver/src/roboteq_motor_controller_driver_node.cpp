@@ -105,8 +105,8 @@ bool Driver::maintenanceservice(roboteq_motor_controller_driver::maintenance_srv
 void Driver::roboteq_services()
 {
     ros::NodeHandle n;
-    configsrv = n.advertiseService("config_service", &Driver::configservice, this);
-    commandsrv = n.advertiseService("command_service", &Driver::commandservice, this);
+    configsrv      = n.advertiseService("config_service", &Driver::configservice, this);
+    commandsrv     = n.advertiseService("command_service", &Driver::commandservice, this);
     maintenancesrv = n.advertiseService("maintenance_service", &Driver::maintenanceservice, this);
 }
 
@@ -220,7 +220,6 @@ void Driver::run()
                 for (int i = 0; i < publisherVecH.size(); ++i)
                 {
                     std::vector<std::string> sub_fields_H;
-
                     boost::split(sub_fields_H, fields_H[i + 1], boost::algorithm::is_any_of(":"));
                     roboteq_motor_controller_driver::channel_values Q1;
 
@@ -229,7 +228,6 @@ void Driver::run()
                     {
                         Q1.value.push_back(boost::lexical_cast<int>(sub_fields_H[j]));
                     }
-
                     publisherVecH[i].publish(Q1);
                 }
             }
@@ -249,16 +247,13 @@ void Driver::run()
                 for (int i = 0; i < publisherVecL.size(); ++i)
                 {
                     std::vector<std::string> sub_fields_L;
-
                     boost::split(sub_fields_L, fields_L[i + 1], boost::algorithm::is_any_of(":"));
-
                     roboteq_motor_controller_driver::channel_values Q1;
                     Q1.value.push_back(0);
                     for (int j = 0; j < sub_fields_L.size(); j++)
                     {
                         Q1.value.push_back(boost::lexical_cast<int>(sub_fields_L[j]));
                     }
-
                     publisherVecL[i].publish(Q1);
                 }
             }
@@ -269,13 +264,10 @@ void Driver::run()
                 {
                     std_msgs::String Q1;
                     Q1.data = fields_G[i + 1];
-
                     publisherVecG[i].publish(Q1);
                 }
             }
-
-            //ROS_INFO_STREAM("success!");
-
+            // ROS_INFO_STREAM("success!");
             Driver::roboteq_subscriber();
         }
         loop_rate.sleep();

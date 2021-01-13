@@ -24,16 +24,14 @@ bool Driver::commandservice(roboteq_motor_controller_driver::command_srv::Reques
     return true;
 }
 
-bool Driver::maintenanceservice(roboteq_motor_controller_driver::maintenance_srv::Request &request,
+bool Driver::maintenanceservice(roboteq_motor_controller_driver::maintenance_srv::Request & request,
                                 roboteq_motor_controller_driver::maintenance_srv::Response &response)
 {
     std::stringstream str;
     str << "%" << request.userInput << " "
         << "_";
     ser.write(str.str());
-
     response.result = ser.read(ser.available());
-
     ROS_INFO_STREAM(response.result);
     return true;
 }
