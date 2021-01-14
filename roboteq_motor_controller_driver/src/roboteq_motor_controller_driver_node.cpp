@@ -18,6 +18,10 @@ serial::Serial ser;
 
 using namespace roboteq;
 
+Driver::Driver()
+{
+}
+
 void Driver::connect()
 {
     try
@@ -49,16 +53,24 @@ Example:
 	!G 1 500 : In Closed Loop Relative or Closed Loop Tracking modes, the motor will move to 75% position of the total -1000 to +1000 motion range
 	!G 1 500 : In Torque mode, assuming that Amps Limit is 60A, motor power will rise until 30A are measured.
 */
+
 void Driver::cmd_vel_callback(const geometry_msgs::Twist &msg)
 {
+    cmd_vr = msg.linear.x - msg.angular.z * WHEEL_AXLE_LEN / 2.0;
+    cmd_vl = msg.linear.x + msg.angular.z * WHEEL_AXLE_LEN / 2.0;
+
+    cmd_rpm_r = cmd_vr * 60.0 / DIST_PER_ROTATION;
+    cmd_rpm_l = cmd_vl * 60.0 / DIST_PER_ROTATION;
+
     std::stringstream cmd_sub;
     cmd_sub << "!G 1"
-            << " " << msg.linear.x << "_"
+            << " " << round(cmd_rpm_r) << "_"
             << "!G 2"
-            << " " << -1 * msg.linear.x << "_";
+            << " " << -1 * round(cmd_rpm_l) << "_";
     ser.write(cmd_sub.str());
     ROS_INFO_STREAM(cmd_sub.str());
 }
+
 void Driver::roboteq_subscriber()
 {
     ros::NodeHandle n;

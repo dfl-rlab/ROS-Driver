@@ -32,6 +32,10 @@
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/regex.hpp>
 
+#define WHEEL_AXLE_LEN 0.395
+#define WHEEL_RADIUS 0.155
+#define DIST_PER_ROTATION 2.0 * M_PI* WHEEL_RADIUS
+
 namespace roboteq
 {
 class Driver
@@ -43,6 +47,7 @@ class Driver
     ros::ServiceServer commandsrv;
     ros::ServiceServer maintenancesrv;
 
+    Driver();
     void connect();
     void run();
     void roboteq_subscriber();
@@ -54,6 +59,11 @@ class Driver
     int frequencyH;
     int frequencyL;
     int frequencyG;
+
+    double cmd_vr;
+    double cmd_vl;
+    double cmd_rpm_r;
+    double cmd_rpm_l;
 
     void roboteq_services();
     bool configservice(roboteq_motor_controller_driver::config_srv::Request& req, roboteq_motor_controller_driver::config_srv::Response& res);
