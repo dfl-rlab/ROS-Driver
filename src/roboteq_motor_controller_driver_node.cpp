@@ -59,8 +59,8 @@ void Driver::cmd_vel_callback(const geometry_msgs::Twist &msg)
     cmd_vr = msg.linear.x + msg.angular.z * WHEEL_AXLE_LEN / 2.0;
     cmd_vl = msg.linear.x - msg.angular.z * WHEEL_AXLE_LEN / 2.0;
 
-    cmd_rpm_r = cmd_vr * 60.0 / WHEEL_CIRCUMFERENCE;
-    cmd_rpm_l = cmd_vl * 60.0 / WHEEL_CIRCUMFERENCE;
+    cmd_rpm_r = cmd_vr / double(WHEEL_CIRCUMFERENCE) * 60.0 / MAX_RPM * 1000.0;
+    cmd_rpm_l = cmd_vl / double(WHEEL_CIRCUMFERENCE) * 60.0 / MAX_RPM * 1000.0;
 
     std::stringstream cmd_sub;
     cmd_sub << "!G 1"
@@ -68,6 +68,7 @@ void Driver::cmd_vel_callback(const geometry_msgs::Twist &msg)
             << "!G 2"
             << " " << -1 * round(cmd_rpm_l) << "_";
     ser.write(cmd_sub.str());
+    ser.flush();
     ROS_INFO_STREAM(cmd_sub.str());
 }
 
@@ -83,6 +84,7 @@ bool Driver::configservice(roboteq_motor_controller_driver::config_srv::Request 
     str << "^" << request.userInput << " " << request.channel << " " << request.value << "_ "
         << "%\clsav321654987";
     ser.write(str.str());
+    ser.flush();
     response.result = str.str();
 
     ROS_INFO_STREAM(response.result);
@@ -94,6 +96,7 @@ bool Driver::commandservice(roboteq_motor_controller_driver::command_srv::Reques
     std::stringstream str;
     str << "!" << request.userInput << " " << request.channel << " " << request.value << "_";
     ser.write(str.str());
+    ser.flush();
     response.result = str.str();
 
     ROS_INFO_STREAM(response.result);
@@ -107,7 +110,7 @@ bool Driver::maintenanceservice(roboteq_motor_controller_driver::maintenance_srv
     str << "%" << request.userInput << " "
         << "_";
     ser.write(str.str());
-
+    ser.flush();
     response.result = ser.read(ser.available());
 
     ROS_INFO_STREAM(response.result);
@@ -204,9 +207,11 @@ void Driver::run()
     ser.write(ss1.str());
     ser.write(ss2.str());
     ser.write(ss3.str());
+    ser.flush();
+
     read_publisher = nh.advertise<std_msgs::String>("read", 1000);
 
-    ros::Rate loop_rate(5);
+    ros::Rate loop_rate(50);
     while (ros::ok())
     {
         ros::spinOnce();
@@ -220,7 +225,7 @@ void Driver::run()
             boost::replace_all(result.data, "\r", "");
             boost::replace_all(result.data, "+", "");
             std::vector<std::string> fields;
-
+            /*
             std::vector<std::string> Field9;
             boost::split(fields, result.data, boost::algorithm::is_any_of("D"));
 
@@ -279,10 +284,15 @@ void Driver::run()
                     publisherVecG[i].publish(Q1);
                 }
             }
+            */
             // ROS_INFO_STREAM("success!");
             Driver::roboteq_subscriber();
         }
         loop_rate.sleep();
         //ROS_INFO_STREAM("Type the command - \"rostopic list\" - in new terminal for publishers");
     }
+    if (ser.isOpen())
+        ser.close();
+
+    ROS_INFO("Exiting");
 }
