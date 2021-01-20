@@ -20,6 +20,7 @@ using namespace roboteq;
 
 Driver::Driver()
 {
+    readParams();
 }
 
 void Driver::connect()
@@ -56,11 +57,11 @@ Example:
 
 void Driver::cmd_vel_callback(const geometry_msgs::Twist &msg)
 {
-    cmd_vr = msg.linear.x + msg.angular.z * WHEEL_AXLE_LEN / 2.0;
-    cmd_vl = msg.linear.x - msg.angular.z * WHEEL_AXLE_LEN / 2.0;
+    cmd_vr = msg.linear.x + msg.angular.z * wheel_axle_length / 2.0;
+    cmd_vl = msg.linear.x - msg.angular.z * wheel_axle_length / 2.0;
 
-    cmd_rpm_r = cmd_vr / double(WHEEL_CIRCUMFERENCE) * 60.0 / MAX_RPM * 1000.0;
-    cmd_rpm_l = cmd_vl / double(WHEEL_CIRCUMFERENCE) * 60.0 / MAX_RPM * 1000.0;
+    cmd_rpm_r = cmd_vr / double(wheel_circumference) * 60.0 / max_rpm * 1000.0;
+    cmd_rpm_l = cmd_vl / double(wheel_circumference) * 60.0 / max_rpm * 1000.0;
 
     std::stringstream cmd_sub;
     cmd_sub << "!G 1"
@@ -125,14 +126,47 @@ void Driver::roboteq_services()
     maintenancesrv = n.advertiseService("maintenance_service", &Driver::maintenanceservice, this);
 }
 
-void Driver::run()
+void Driver::readParams()
 {
-    std_msgs::String str1;
-    ros::NodeHandle  nh;
+    nh.param("robot/pub_odom", pub_odom, true);
+    ROS_INFO_STREAM("pub_odom: " << pub_odom);
+    nh.param("drive/open_loop", open_loop, false);
+    ROS_INFO_STREAM("open_loop: " << open_loop);
+
+    nh.param<std::string>("drive/serial_port", serial_port, "/dev/ttyACM0");
+    ROS_INFO_STREAM("serial_port: " << serial_port);
+    nh.param<std::string>("drive/odom_frame", odom_frame, "odom");
+    ROS_INFO_STREAM("odom_frame: " << odom_frame);
+    nh.param<std::string>("drive/base_frame", base_frame, "base_link");
+    ROS_INFO_STREAM("base_frame: " << base_frame);
+    nh.param<std::string>("drive/cmd_vel_topic", cmd_vel_topic, "cmd_vel");
+    ROS_INFO_STREAM("cmd_vel_topic: " << cmd_vel_topic);
+
+    nh.param("robot/wheel_axle_length", wheel_axle_length, 0.395);
+    ROS_INFO_STREAM("wheel_axle_length: " << wheel_axle_length);
+    nh.param("robot/wheel_radius", wheel_radius, 0.155);
+    ROS_INFO_STREAM("wheel_radius: " << wheel_radius);
+
+    nh.param("dive/baud_rate", baud_rate, 115200);
+    ROS_INFO_STREAM("baud_rate: " << baud_rate);
+    nh.param("dive/encoder_ppr", encoder_ppr, 900);
+    ROS_INFO_STREAM("encoder_ppr: " << encoder_ppr);
+    nh.param("dive/encoder_cpr", encoder_cpr, 3600);
+    ROS_INFO_STREAM("encoder_cpr: " << encoder_cpr);
+    nh.param("dive/max_amp", max_amp, 100);
+    ROS_INFO_STREAM("max_amp: " << max_amp);
+    nh.param("dive/max_rpm", max_rpm, 3000);
+    ROS_INFO_STREAM("max_rpm: " << max_rpm);
+
     nh.getParam("frequencyH", frequencyH);
     nh.getParam("frequencyL", frequencyL);
     nh.getParam("frequencyG", frequencyG);
 
+    wheel_circumference = 2.0 * M_PI * wheel_radius;
+}
+
+void Driver::run()
+{
     typedef std::string Key;
     typedef std::string Val;
     std::map<Key, Val>  map_sH;
@@ -149,9 +183,7 @@ void Driver::run()
     for (std::map<Key, Val>::iterator iter = map_sH.begin(); iter != map_sH.end(); ++iter)
     {
         Key KH = iter->first;
-
         KH_vector.push_back(KH);
-
         Val VH = iter->second;
         ss1 << VH << "_";
     }
@@ -171,7 +203,6 @@ void Driver::run()
     {
         Key KL = iter->first;
         KL_vector.push_back(KL);
-
         Val VL = iter->second;
         ss2 << VL << "_";
     }
@@ -191,7 +222,6 @@ void Driver::run()
     {
         Key KG = iter->first;
         KG_vector.push_back(KG);
-
         Val VG = iter->second;
         ss3 << VG << "_";
     }

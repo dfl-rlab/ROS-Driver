@@ -32,10 +32,12 @@
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/regex.hpp>
 
+/*
 #define WHEEL_AXLE_LEN 0.395
 #define WHEEL_RADIUS 0.155
 #define WHEEL_CIRCUMFERENCE 2.0 * M_PI* WHEEL_RADIUS
 #define MAX_RPM 3000
+*/
 
 namespace roboteq
 {
@@ -50,6 +52,7 @@ class Driver
 
     Driver();
     void connect();
+    void readParams();
     void run();
     void roboteq_subscriber();
     void roboteq_publisher();
@@ -72,10 +75,27 @@ class Driver
     bool maintenanceservice(roboteq_motor_controller_driver::maintenance_srv::Request& req, roboteq_motor_controller_driver::maintenance_srv::Response& res);
 
   private:
-    int         baud_rate;
-    std::string port;
+    ros::NodeHandle nh;
+
+    double wheel_axle_length;
+    double wheel_radius;
+    double wheel_circumference;
+
+    bool pub_odom;
+    bool open_loop;
+
+    std::string odom_frame;
+    std::string base_frame;
+    std::string cmd_vel_topic;
+    std::string serial_port;
     std::string firmware;
-    int         channel;
+
+    int baud_rate;
+    int encoder_ppr;
+    int encoder_cpr;
+    int max_amp;
+    int max_rpm;
+    int channel;
 
     geometry_msgs::TransformStamped tf_msg;
     tf::TransformBroadcaster        odom_broadcaster;
