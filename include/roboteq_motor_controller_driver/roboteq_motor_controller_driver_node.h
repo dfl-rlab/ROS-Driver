@@ -34,7 +34,7 @@
 
 #define WHEEL_AXLE_LEN 0.395
 #define WHEEL_RADIUS 0.155
-#define DIST_PER_ROTATION 2.0 * M_PI* WHEEL_RADIUS
+#define WHEEL_CIRCUMFERENCE 2.0 * M_PI* WHEEL_RADIUS
 
 namespace roboteq
 {

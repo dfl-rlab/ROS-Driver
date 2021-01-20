@@ -56,11 +56,11 @@ Example:
 
 void Driver::cmd_vel_callback(const geometry_msgs::Twist &msg)
 {
-    cmd_vr = msg.linear.x - msg.angular.z * WHEEL_AXLE_LEN / 2.0;
-    cmd_vl = msg.linear.x + msg.angular.z * WHEEL_AXLE_LEN / 2.0;
+    cmd_vr = msg.linear.x + msg.angular.z * WHEEL_AXLE_LEN / 2.0;
+    cmd_vl = msg.linear.x - msg.angular.z * WHEEL_AXLE_LEN / 2.0;
 
-    cmd_rpm_r = cmd_vr * 60.0 / DIST_PER_ROTATION;
-    cmd_rpm_l = cmd_vl * 60.0 / DIST_PER_ROTATION;
+    cmd_rpm_r = cmd_vr * 60.0 / WHEEL_CIRCUMFERENCE;
+    cmd_rpm_l = cmd_vl * 60.0 / WHEEL_CIRCUMFERENCE;
 
     std::stringstream cmd_sub;
     cmd_sub << "!G 1"
